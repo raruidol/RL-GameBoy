@@ -17,9 +17,9 @@ tetris = pyboy.game_wrapper()
 
 def game_area_changed(ga1, ga2):
     if np.array_equal(ga1, ga2):
-        return True
-    else:
         return False
+    else:
+        return True
 
 
 def tetris_game_ended(ga):
@@ -29,7 +29,7 @@ def tetris_game_ended(ga):
     else:
         return False
 
-
+'''
 def release_key(i):
     if i == 0:
         pyboy.send_input(WindowEvent.RELEASE_ARROW_RIGHT)
@@ -37,15 +37,22 @@ def release_key(i):
         pyboy.send_input(WindowEvent.RELEASE_ARROW_LEFT)
     else:
         pass
+'''
+
+def release_right():
+    pyboy.send_input(WindowEvent.RELEASE_ARROW_RIGHT)
+
+
+def release_left():
+    pyboy.send_input(WindowEvent.RELEASE_ARROW_LEFT)
+
 
 def press_right():
     pyboy.send_input(WindowEvent.PRESS_ARROW_RIGHT)
-    #pyboy.send_input(WindowEvent.RELEASE_ARROW_RIGHT)
 
 
 def press_left():
     pyboy.send_input(WindowEvent.PRESS_ARROW_LEFT)
-    #pyboy.send_input(WindowEvent.RELEASE_ARROW_LEFT)
 
 
 ACTIONS = [press_right(), press_left()]
@@ -127,45 +134,50 @@ def main():
 
     tetris.start_game()
 
-    gamma = 0.9
-    epsilon = .95
-
     trials = 1000
-    trial_len = 500
+    trial_len = 5000000000
 
     # updateTargetNetwork = 1000
     dqn_agent = DQN(env=tetris)
-    steps = []
-    for trial in range(trials):
-        cur_state = get_state(tetris.game_area())
 
-        #print(cur_state)
+    for trial in range(trials):
+        tetris.reset_game()
+        cur_state = get_state(tetris.game_area())
+        prev_action = None
+        print('-----------------------')
         for step in range(trial_len):
 
-            if step % 2 == 0:  # Even frames
-                action = dqn_agent.act(cur_state)
-            else:
-                release_key(action)
+            if step % 2 == 0:
+                pyboy.tick()
 
-            print(action)
+                new_state = get_state(tetris.game_area())
 
-            # En cada paso recoger el nuevo estado, la reward y la comprovación de si está done la partida
-            pyboy.tick()
-            new_state = get_state(tetris.game_area())
-            if game_area_changed(cur_state, new_state):
+                if game_area_changed(cur_state, new_state):
 
+                    action = dqn_agent.act(cur_state)
+                    prev_action = action
 
-                reward = tetris.score
-                #print(new_state, reward, tetris_game_ended(tetris.game_area()))
+                    print(action)
 
-                dqn_agent.remember(cur_state, action, reward, new_state, tetris_game_ended(tetris.game_area()))
+                    reward = tetris.score
+                    #print(new_state, reward, tetris_game_ended(tetris.game_area()))
 
-                dqn_agent.replay()  # internally iterates default (prediction) model
-                dqn_agent.target_train()  # iterates target model
+                    dqn_agent.remember(cur_state, action, reward, new_state, tetris_game_ended(tetris.game_area()))
 
-                cur_state = new_state
+                    dqn_agent.replay()  # internally iterates default (prediction) model
+                    dqn_agent.target_train()  # iterates target model
+
+                    cur_state = new_state
+
                 if tetris_game_ended(tetris.game_area()):
                     break
+
+            else:
+                pyboy.tick()
+                if prev_action == 0:
+                    release_right()
+                elif prev_action == 1:
+                    release_left()
 
         '''
         if step >= 199:
