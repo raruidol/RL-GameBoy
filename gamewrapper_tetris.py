@@ -15,6 +15,20 @@ pyboy.set_emulation_speed(0)
 tetris = pyboy.game_wrapper()
 
 
+def game_area_changed(ga1, ga2):
+    if np.array_equal(ga1, ga2):
+        return True
+    else:
+        return False
+
+
+def tetris_game_ended(ga):
+    if 135 in ga:
+        return True
+    else:
+        return False
+
+
 def press_right():
     pyboy.send_input(WindowEvent.PRESS_ARROW_RIGHT)
     pyboy.send_input(WindowEvent.RELEASE_ARROW_RIGHT)
