@@ -9,7 +9,7 @@ from collections import deque
 
 
 filename = 'ROMs/Tetris_World.gb'
-quiet = True
+quiet = False
 pyboy = PyBoy(filename, window_type="headless" if quiet else "SDL2", window_scale=3, debug=not quiet, game_wrapper=True)
 pyboy.set_emulation_speed(0)
 tetris = pyboy.game_wrapper()
@@ -23,20 +23,29 @@ def game_area_changed(ga1, ga2):
 
 
 def tetris_game_ended(ga):
-    if 135 in ga:
+    screen = np.asarray(ga, dtype='float32')
+    if 135 in screen:
         return True
     else:
         return False
 
 
+def release_key(i):
+    if i == 0:
+        pyboy.send_input(WindowEvent.RELEASE_ARROW_RIGHT)
+    elif i == 1:
+        pyboy.send_input(WindowEvent.RELEASE_ARROW_LEFT)
+    else:
+        pass
+
 def press_right():
     pyboy.send_input(WindowEvent.PRESS_ARROW_RIGHT)
-    pyboy.send_input(WindowEvent.RELEASE_ARROW_RIGHT)
+    #pyboy.send_input(WindowEvent.RELEASE_ARROW_RIGHT)
 
 
 def press_left():
     pyboy.send_input(WindowEvent.PRESS_ARROW_LEFT)
-    pyboy.send_input(WindowEvent.RELEASE_ARROW_LEFT)
+    #pyboy.send_input(WindowEvent.RELEASE_ARROW_LEFT)
 
 
 ACTIONS = [press_right(), press_left()]
@@ -69,7 +78,7 @@ class DQN:
         model.add(Dense(48, activation="relu"))
         model.add(Dense(24, activation="relu"))
         model.add(Dense(len(ACTIONS)))
-        model.summary()
+        #model.summary()
         model.compile(loss="mean_squared_error",
                       optimizer=Adam(lr=self.learning_rate))
 
@@ -79,8 +88,9 @@ class DQN:
         self.epsilon *= self.epsilon_decay
         self.epsilon = max(self.epsilon_min, self.epsilon)
         if np.random.random() < self.epsilon:
-            return ACTIONS[0]
+            return random.choice(ACTIONS)
         pred = self.model.predict(state)
+        ACTIONS[np.argmax(pred[0])]
         return np.argmax(pred[0])
 
     def remember(self, state, action, reward, new_state, done):
@@ -131,26 +141,33 @@ def main():
 
         #print(cur_state)
         for step in range(trial_len):
-            action = dqn_agent.act(cur_state)
+
+            if step % 2 == 0:  # Even frames
+                action = dqn_agent.act(cur_state)
+            else:
+                release_key(action)
+
+            print(action)
 
             # En cada paso recoger el nuevo estado, la reward y la comprovación de si está done la partida
             pyboy.tick()
             new_state = get_state(tetris.game_area())
-            reward = tetris.score
-            done = pyboy.tick()
-            #new_state, reward, done, _ = env.step(action)
-            #print(new_state, reward, done)
+            if game_area_changed(cur_state, new_state):
 
-            # reward = reward if not done else -20
-            #new_state = new_state.reshape(1, 2)
-            dqn_agent.remember(cur_state, action, reward, new_state, done)
 
-            dqn_agent.replay()  # internally iterates default (prediction) model
-            dqn_agent.target_train()  # iterates target model
+                reward = tetris.score
+                #print(new_state, reward, tetris_game_ended(tetris.game_area()))
 
-            cur_state = new_state
-            if done:
-                break
+                dqn_agent.remember(cur_state, action, reward, new_state, tetris_game_ended(tetris.game_area()))
+
+                dqn_agent.replay()  # internally iterates default (prediction) model
+                dqn_agent.target_train()  # iterates target model
+
+                cur_state = new_state
+                if tetris_game_ended(tetris.game_area()):
+                    break
+
+        '''
         if step >= 199:
             print("Failed to complete in trial {}".format(trial))
             if step % 10 == 0:
@@ -159,7 +176,7 @@ def main():
             print("Completed in {} trials".format(trial))
             dqn_agent.save_model("success.model")
             break
-
+        '''
 
 if __name__ == "__main__":
     main()
