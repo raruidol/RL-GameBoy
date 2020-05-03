@@ -29,15 +29,6 @@ def tetris_game_ended(ga):
     else:
         return False
 
-'''
-def release_key(i):
-    if i == 0:
-        pyboy.send_input(WindowEvent.RELEASE_ARROW_RIGHT)
-    elif i == 1:
-        pyboy.send_input(WindowEvent.RELEASE_ARROW_LEFT)
-    else:
-        pass
-'''
 
 def release_right():
     pyboy.send_input(WindowEvent.RELEASE_ARROW_RIGHT)
@@ -55,7 +46,7 @@ def press_left():
     pyboy.send_input(WindowEvent.PRESS_ARROW_LEFT)
 
 
-ACTIONS = [press_right(), press_left()]
+ACTIONS = [press_right, press_left]
 
 
 def get_state(state):
@@ -95,9 +86,9 @@ class DQN:
         self.epsilon *= self.epsilon_decay
         self.epsilon = max(self.epsilon_min, self.epsilon)
         if np.random.random() < self.epsilon:
-            return random.choice(ACTIONS)
+            r = random.randint(0, len(ACTIONS)-1)
+            return r
         pred = self.model.predict(state)
-        ACTIONS[np.argmax(pred[0])]
         return np.argmax(pred[0])
 
     def remember(self, state, action, reward, new_state, done):
@@ -152,9 +143,12 @@ def main():
 
                 new_state = get_state(tetris.game_area())
 
+                print(new_state)
+
                 if game_area_changed(cur_state, new_state):
 
                     action = dqn_agent.act(cur_state)
+                    ACTIONS[action]()
                     prev_action = action
 
                     print(action)
@@ -174,10 +168,19 @@ def main():
 
             else:
                 pyboy.tick()
-                if prev_action == 0:
-                    release_right()
-                elif prev_action == 1:
-                    release_left()
+
+                new_state = get_state(tetris.game_area())
+
+                if game_area_changed(cur_state, new_state):
+                    if prev_action == 0:
+                        release_right()
+                    elif prev_action == 1:
+                        release_left()
+
+                    cur_state = new_state
+
+                if tetris_game_ended(tetris.game_area()):
+                    break
 
         '''
         if step >= 199:
